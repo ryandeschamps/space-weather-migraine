@@ -236,7 +236,7 @@ def main():
         st.header("📈 Time Series Analysis")
         
         # Create tabs for different types of data
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📊 All Data Overview", "🌍 Geomagnetic Activity", "☀️ Solar Activity", "🌟 Solar Flares", "🔗 Correlations", "🧠 Health Analysis"])
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(["📊 All Data Overview", "🌍 Geomagnetic Activity", "☀️ Solar Activity", "🌟 Solar Flares", "🔗 Correlations", "🧠 Health Analysis", "🤖 AI Analysis"])
         
         with tab1:
             st.subheader("📊 Complete Dataset Overview")
@@ -935,6 +935,251 @@ def main():
                     st.error("🚨 **Geomagnetic storm in progress.** Consider extra health precautions if you're sensitive to space weather.")
                 else:
                     st.success("✅ **Quiet space weather conditions.** Lower likelihood of space weather-related health effects.")
+        
+        with tab7:
+            st.header("🤖 Advanced AI Analysis")
+            st.markdown("**Multi-factor machine learning analysis to identify complex patterns between solar activity and health events**")
+            
+            # AI Analysis requires the imports at the top
+            try:
+                import sklearn
+                from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+                from sklearn.model_selection import train_test_split, cross_val_score
+                from sklearn.preprocessing import StandardScaler
+                from sklearn.metrics import classification_report, confusion_matrix
+                import xgboost as xgb
+                import lightgbm as lgb
+                
+                # Advanced AI analysis implementation
+                ai_analysis_available = True
+            except ImportError as e:
+                st.warning(f"⚠️ AI libraries not available in deployment environment: {str(e)}")
+                st.info("💡 AI analysis is available when running locally with GPU acceleration")
+                ai_analysis_available = False
+            
+            if ai_analysis_available:
+                # Feature engineering for AI models
+                st.subheader("🔧 Feature Engineering")
+                
+                # Create comprehensive feature set
+                ai_features = df_filtered.copy()
+                
+                # Add time-based features
+                ai_features['day_of_year'] = ai_features['date'].dt.dayofyear
+                ai_features['month'] = ai_features['date'].dt.month
+                ai_features['week_of_year'] = ai_features['date'].dt.isocalendar().week
+                
+                # Rolling statistics (capture temporal patterns)
+                window_sizes = [3, 7, 14]
+                for window in window_sizes:
+                    if 'max_kp' in ai_features.columns:
+                        ai_features[f'kp_rolling_mean_{window}d'] = ai_features['max_kp'].rolling(window=window).mean()
+                        ai_features[f'kp_rolling_std_{window}d'] = ai_features['max_kp'].rolling(window=window).std()
+                        ai_features[f'kp_rolling_max_{window}d'] = ai_features['max_kp'].rolling(window=window).max()
+                    
+                    if 'sunspot_number' in ai_features.columns:
+                        ai_features[f'sunspot_rolling_mean_{window}d'] = ai_features['sunspot_number'].rolling(window=window).mean()
+                        ai_features[f'sunspot_rolling_std_{window}d'] = ai_features['sunspot_number'].rolling(window=window).std()
+                
+                # Interaction features
+                if 'max_kp' in ai_features.columns and 'sunspot_number' in ai_features.columns:
+                    ai_features['kp_sunspot_interaction'] = ai_features['max_kp'] * ai_features['sunspot_number']
+                    ai_features['kp_sunspot_ratio'] = ai_features['max_kp'] / (ai_features['sunspot_number'] + 1)
+                
+                # Storm intensity features
+                if 'max_kp' in ai_features.columns:
+                    ai_features['storm_intensity'] = pd.cut(ai_features['max_kp'], 
+                                                          bins=[0, 2, 4, 5, 6, 7, 10], 
+                                                          labels=[0, 1, 2, 3, 4, 5]).astype(float)
+                
+                # Display feature summary
+                feature_cols = [col for col in ai_features.columns if col not in ['date', 'migraine']]
+                st.write(f"**Generated {len(feature_cols)} features** including temporal patterns, rolling statistics, and interaction terms")
+                
+                # Advanced ML Analysis
+                st.subheader("🧠 Multi-Algorithm Analysis")
+                
+                # Prepare data for ML
+                if 'migraine' in ai_features.columns:
+                    # Remove rows with NaN values
+                    ml_data = ai_features.dropna()
+                    
+                    if len(ml_data) > 10:  # Need sufficient data
+                        X = ml_data[feature_cols].select_dtypes(include=[np.number])
+                        y = ml_data['migraine'].astype(int)
+                        
+                        # Handle case where we have very few positive samples
+                        positive_samples = y.sum()
+                        total_samples = len(y)
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Total Samples", total_samples)
+                        with col2:
+                            st.metric("Migraine Episodes", positive_samples)
+                        with col3:
+                            st.metric("Class Balance", f"{positive_samples/total_samples:.1%}")
+                        
+                        if positive_samples > 0 and total_samples > positive_samples:
+                            st.subheader("🎯 Predictive Models")
+                            
+                            # Multiple algorithms comparison
+                            algorithms = {
+                                'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
+                                'Gradient Boosting': GradientBoostingClassifier(random_state=42),
+                                'XGBoost': xgb.XGBClassifier(random_state=42, eval_metric='logloss'),
+                                'LightGBM': lgb.LGBMClassifier(random_state=42, verbose=-1)
+                            }
+                            
+                            # Cross-validation scores
+                            cv_results = {}
+                            feature_importance = {}
+                            
+                            for name, model in algorithms.items():
+                                try:
+                                    # Cross-validation
+                                    cv_scores = cross_val_score(model, X, y, cv=min(5, total_samples//2), scoring='roc_auc')
+                                    cv_results[name] = {
+                                        'Mean CV Score': f"{cv_scores.mean():.3f}",
+                                        'Std CV Score': f"{cv_scores.std():.3f}"
+                                    }
+                                    
+                                    # Fit model for feature importance
+                                    model.fit(X, y)
+                                    if hasattr(model, 'feature_importances_'):
+                                        importance = pd.DataFrame({
+                                            'feature': X.columns,
+                                            'importance': model.feature_importances_
+                                        }).sort_values('importance', ascending=False)
+                                        feature_importance[name] = importance.head(10)
+                                        
+                                except Exception as e:
+                                    cv_results[name] = {'Error': str(e)}
+                            
+                            # Display results
+                            if cv_results:
+                                st.write("**Cross-Validation Performance:**")
+                                results_df = pd.DataFrame(cv_results).T
+                                st.dataframe(results_df, use_container_width=True)
+                            
+                            # Feature importance analysis
+                            if feature_importance:
+                                st.subheader("🔍 Feature Importance Analysis")
+                                
+                                # Select best performing model
+                                best_model = 'Random Forest'  # Default
+                                if cv_results:
+                                    try:
+                                        best_model = max(cv_results.keys(), 
+                                                       key=lambda x: float(cv_results[x].get('Mean CV Score', '0')))
+                                    except:
+                                        pass
+                                
+                                if best_model in feature_importance:
+                                    st.write(f"**Top Features from {best_model}:**")
+                                    
+                                    # Create importance plot
+                                    importance_data = feature_importance[best_model]
+                                    fig_importance = px.bar(
+                                        importance_data.head(15),
+                                        x='importance',
+                                        y='feature',
+                                        orientation='h',
+                                        title=f"Top 15 Feature Importances - {best_model}",
+                                        labels={'importance': 'Feature Importance', 'feature': 'Features'}
+                                    )
+                                    fig_importance.update_layout(height=600)
+                                    st.plotly_chart(fig_importance, use_container_width=True)
+                                    
+                                    # Insights
+                                    top_features = importance_data.head(5)['feature'].tolist()
+                                    st.info(f"🎯 **Key Insights**: The most predictive features are: {', '.join(top_features[:3])}")
+                        
+                        # Pattern Discovery
+                        st.subheader("🔍 Pattern Discovery")
+                        
+                        # Clustering analysis for pattern discovery
+                        from sklearn.cluster import KMeans
+                        from sklearn.decomposition import PCA
+                        
+                        # PCA for dimensionality reduction
+                        scaler = StandardScaler()
+                        X_scaled = scaler.fit_transform(X.fillna(X.mean()))
+                        
+                        pca = PCA(n_components=min(5, X_scaled.shape[1]))
+                        X_pca = pca.fit_transform(X_scaled)
+                        
+                        # Clustering
+                        n_clusters = min(4, len(ml_data)//2)
+                        if n_clusters >= 2:
+                            kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+                            clusters = kmeans.fit_predict(X_pca)
+                            
+                            # Visualize clusters
+                            cluster_df = pd.DataFrame({
+                                'PC1': X_pca[:, 0],
+                                'PC2': X_pca[:, 1],
+                                'Cluster': clusters,
+                                'Migraine': y,
+                                'Date': ml_data['date'].values
+                            })
+                            
+                            fig_cluster = px.scatter(
+                                cluster_df,
+                                x='PC1',
+                                y='PC2',
+                                color='Cluster',
+                                symbol='Migraine',
+                                title="Space Weather Patterns (PCA + K-Means Clustering)",
+                                hover_data=['Date']
+                            )
+                            st.plotly_chart(fig_cluster, use_container_width=True)
+                            
+                            # Cluster analysis
+                            cluster_analysis = []
+                            for cluster_id in range(n_clusters):
+                                cluster_mask = clusters == cluster_id
+                                cluster_migraines = y[cluster_mask].sum()
+                                cluster_total = cluster_mask.sum()
+                                cluster_rate = cluster_migraines / cluster_total if cluster_total > 0 else 0
+                                
+                                cluster_analysis.append({
+                                    'Cluster': f"Cluster {cluster_id}",
+                                    'Days': cluster_total,
+                                    'Migraines': cluster_migraines,
+                                    'Migraine Rate': f"{cluster_rate:.1%}"
+                                })
+                            
+                            cluster_df_summary = pd.DataFrame(cluster_analysis)
+                            st.write("**Cluster Analysis:**")
+                            st.dataframe(cluster_df_summary, use_container_width=True)
+                        
+                    else:
+                        st.warning("⚠️ Insufficient data for machine learning analysis. Need more historical data.")
+                else:
+                    st.info("💡 Migraine data not available for AI analysis. Please ensure health data is properly loaded.")
+            
+            else:
+                # Simplified analysis for deployment
+                st.subheader("📊 Basic Pattern Analysis")
+                st.info("💡 **Local Development Required**: Advanced AI analysis with GPU acceleration is available when running locally with the full ML stack.")
+                
+                # Simple correlation analysis
+                if 'migraine' in df_filtered.columns and 'max_kp' in df_filtered.columns:
+                    migraine_days = df_filtered[df_filtered['migraine'] == True]
+                    if len(migraine_days) > 0:
+                        st.write("**Simple Pattern Detection:**")
+                        avg_kp_migraine = migraine_days['max_kp'].mean()
+                        avg_kp_normal = df_filtered[df_filtered['migraine'] == False]['max_kp'].mean()
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.metric("Avg Kp (Migraine Days)", f"{avg_kp_migraine:.2f}")
+                        with col2:
+                            st.metric("Avg Kp (Normal Days)", f"{avg_kp_normal:.2f}")
+                        
+                        if avg_kp_migraine > avg_kp_normal:
+                            st.info(f"🔍 **Pattern Found**: Space weather activity is {((avg_kp_migraine/avg_kp_normal-1)*100):.1f}% higher on migraine days")
         
         # Summary statistics
         st.header("📊 Summary Statistics")
