@@ -116,6 +116,14 @@ def load_all_data():
     files = glob.glob(os.path.join(data_dir, "*dayind.txt"))
     files.sort()
     
+    # Debug information
+    if not files:
+        st.error(f"No data files found in: {data_dir}")
+        st.error(f"Script directory: {script_dir}")
+        st.error(f"Directory exists: {os.path.exists(data_dir)}")
+        if os.path.exists(script_dir):
+            st.error(f"Contents of script directory: {os.listdir(script_dir)}")
+    
     for file_path in files:
         try:
             parsed_data = parse_space_weather_file(file_path)
@@ -126,6 +134,7 @@ def load_all_data():
     
     if not all_data:
         st.error("No data could be loaded!")
+        st.error(f"Found {len(files)} files but no data was successfully parsed")
         return pd.DataFrame()
     
     # Convert to DataFrame
