@@ -1,0 +1,99 @@
+{
+  "timestamp": "2025-06-04T12:49:00.875823",
+  "model_performance": {
+    "Random Forest": 0.7857142857142857,
+    "XGBoost": 0.5,
+    "LightGBM": 0.7619047619047619,
+    "Neural Network": 0.35714285714285715,
+    "Optimized XGBoost": 0.5
+  },
+  "best_model": "Random Forest",
+  "best_auc": 0.7857142857142857,
+  "feature_count": 47,
+  "sample_count": 73,
+  "migraine_cases": 2,
+  "features_created": [
+    "kp_rolling_mean_3",
+    "kp_rolling_std_3",
+    "kp_rolling_mean_7",
+    "kp_rolling_max_7",
+    "kp_change",
+    "kp_acceleration",
+    "kp_volatility_7",
+    "kp_storm",
+    "kp_active",
+    "storm_days_last_7",
+    "active_days_last_7",
+    "sunspot_rolling_mean_7",
+    "sunspot_rolling_max_7",
+    "sunspot_change",
+    "sunspot_acceleration",
+    "sunspot_volatility",
+    "flux_rolling_mean_3",
+    "flux_rolling_mean_7",
+    "flux_change",
+    "flux_acceleration",
+    "flux_volatility",
+    "total_flares",
+    "total_flares_7d",
+    "max_flare_intensity",
+    "day_of_year",
+    "day_of_year_sin",
+    "day_of_year_cos",
+    "month",
+    "day_of_week",
+    "kp_sunspot_interaction",
+    "kp_flux_interaction",
+    "kp_lag_1",
+    "sunspot_lag_1",
+    "kp_lag_2",
+    "sunspot_lag_2",
+    "kp_lag_3",
+    "sunspot_lag_3"
+  ],
+  "top_features": [
+    {
+      "feature": "day_of_year_cos",
+      "importance": 0.11960454544036576
+    },
+    {
+      "feature": "day_of_year_sin",
+      "importance": 0.10217362245181454
+    },
+    {
+      "feature": "kp_rolling_max_7",
+      "importance": 0.09599183521932741
+    },
+    {
+      "feature": "kp_lag_2",
+      "importance": 0.09397933508872541
+    },
+    {
+      "feature": "kp_rolling_std_3",
+      "importance": 0.07122177592892813
+    },
+    {
+      "feature": "flux_change",
+      "importance": 0.055531136161173174
+    },
+    {
+      "feature": "c_flares",
+      "importance": 0.053410525703448154
+    },
+    {
+      "feature": "sunspot_volatility",
+      "importance": 0.04946839693496382
+    },
+    {
+      "feature": "kp_rolling_mean_3",
+      "importance": 0.046666852402487
+    },
+    {
+      "feature": "radio_flux_90day",
+      "importance": 0.0462404966527822
+    }
+  ],
+  "shap_features": null,
+  "gpu_used": true,
+  "device_info": "NVIDIA GeForce RTX 3090"
+}

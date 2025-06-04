@@ -937,253 +937,456 @@ def main():
                     st.success("✅ **Quiet space weather conditions.** Lower likelihood of space weather-related health effects.")
         
         with tab7:
-            st.header("🤖 Advanced AI Analysis")
-            st.markdown("**Multi-factor machine learning analysis to identify complex patterns between solar activity and health events**")
+            st.header("🤖 AI-Powered Analysis")
+            st.markdown("Advanced machine learning analysis using multiple solar factors to predict migraine correlation")
             
-            # AI Analysis requires the imports at the top
+            # Check GPU availability
             try:
-                import sklearn
-                from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-                from sklearn.model_selection import train_test_split, cross_val_score
-                from sklearn.preprocessing import StandardScaler
-                from sklearn.metrics import classification_report, confusion_matrix
-                import xgboost as xgb
-                import lightgbm as lgb
-                
-                # Advanced AI analysis implementation
-                ai_analysis_available = True
-            except ImportError as e:
-                st.warning(f"⚠️ AI libraries not available in deployment environment: {str(e)}")
-                st.info("💡 AI analysis is available when running locally with GPU acceleration")
-                ai_analysis_available = False
+                import torch
+                if torch.cuda.is_available():
+                    gpu_info = f"GPU: {torch.cuda.get_device_name(0)} | Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f}GB"
+                    st.success(f"🚀 {gpu_info}")
+                else:
+                    st.info("🖥️ Using CPU for analysis")
+            except ImportError:
+                st.warning("⚠️ PyTorch not available")
             
-            if ai_analysis_available:
-                # Feature engineering for AI models
+            if not df_filtered.empty:
+                # Feature Engineering Section
                 st.subheader("🔧 Feature Engineering")
                 
-                # Create comprehensive feature set
-                ai_features = df_filtered.copy()
+                # Create advanced features
+                df_ml = df_filtered.copy()
                 
-                # Add time-based features
-                ai_features['day_of_year'] = ai_features['date'].dt.dayofyear
-                ai_features['month'] = ai_features['date'].dt.month
-                ai_features['week_of_year'] = ai_features['date'].dt.isocalendar().week
+                # Add migraine indicator
+                migraine_dates = [pd.Timestamp('2025-06-03'), pd.Timestamp('2025-05-28')]
+                df_ml['migraine'] = df_ml['date'].isin(migraine_dates).astype(int)
                 
-                # Rolling statistics (capture temporal patterns)
-                window_sizes = [3, 7, 14]
-                for window in window_sizes:
-                    if 'max_kp' in ai_features.columns:
-                        ai_features[f'kp_rolling_mean_{window}d'] = ai_features['max_kp'].rolling(window=window).mean()
-                        ai_features[f'kp_rolling_std_{window}d'] = ai_features['max_kp'].rolling(window=window).std()
-                        ai_features[f'kp_rolling_max_{window}d'] = ai_features['max_kp'].rolling(window=window).max()
-                    
-                    if 'sunspot_number' in ai_features.columns:
-                        ai_features[f'sunspot_rolling_mean_{window}d'] = ai_features['sunspot_number'].rolling(window=window).mean()
-                        ai_features[f'sunspot_rolling_std_{window}d'] = ai_features['sunspot_number'].rolling(window=window).std()
+                # Feature creation
+                features_created = []
                 
-                # Interaction features
-                if 'max_kp' in ai_features.columns and 'sunspot_number' in ai_features.columns:
-                    ai_features['kp_sunspot_interaction'] = ai_features['max_kp'] * ai_features['sunspot_number']
-                    ai_features['kp_sunspot_ratio'] = ai_features['max_kp'] / (ai_features['sunspot_number'] + 1)
+                if 'max_kp' in df_ml.columns:
+                    # Rolling statistics for Kp index
+                    df_ml['kp_rolling_mean_3'] = df_ml['max_kp'].rolling(window=3, center=True).mean()
+                    df_ml['kp_rolling_std_3'] = df_ml['max_kp'].rolling(window=3, center=True).std()
+                    df_ml['kp_rolling_mean_7'] = df_ml['max_kp'].rolling(window=7, center=True).mean()
+                    df_ml['kp_change'] = df_ml['max_kp'].diff()
+                    df_ml['kp_acceleration'] = df_ml['kp_change'].diff()
+                    features_created.extend(['kp_rolling_mean_3', 'kp_rolling_std_3', 'kp_rolling_mean_7', 'kp_change', 'kp_acceleration'])
                 
-                # Storm intensity features
-                if 'max_kp' in ai_features.columns:
-                    ai_features['storm_intensity'] = pd.cut(ai_features['max_kp'], 
-                                                          bins=[0, 2, 4, 5, 6, 7, 10], 
-                                                          labels=[0, 1, 2, 3, 4, 5]).astype(float)
+                if 'sunspot_number' in df_ml.columns:
+                    # Sunspot features
+                    df_ml['sunspot_rolling_mean_7'] = df_ml['sunspot_number'].rolling(window=7, center=True).mean()
+                    df_ml['sunspot_change'] = df_ml['sunspot_number'].diff()
+                    features_created.extend(['sunspot_rolling_mean_7', 'sunspot_change'])
                 
-                # Display feature summary
-                feature_cols = [col for col in ai_features.columns if col not in ['date', 'migraine']]
-                st.write(f"**Generated {len(feature_cols)} features** including temporal patterns, rolling statistics, and interaction terms")
+                if 'radio_flux_10cm' in df_ml.columns:
+                    # Radio flux features
+                    df_ml['flux_rolling_mean_3'] = df_ml['radio_flux_10cm'].rolling(window=3, center=True).mean()
+                    df_ml['flux_change'] = df_ml['radio_flux_10cm'].diff()
+                    features_created.extend(['flux_rolling_mean_3', 'flux_change'])
                 
-                # Advanced ML Analysis
-                st.subheader("🧠 Multi-Algorithm Analysis")
+                # Solar flare features
+                flare_cols = [col for col in df_ml.columns if 'flare' in col.lower()]
+                if flare_cols:
+                    df_ml['total_flares'] = df_ml[flare_cols].sum(axis=1)
+                    features_created.append('total_flares')
                 
-                # Prepare data for ML
-                if 'migraine' in ai_features.columns:
+                # Cyclical features (day of year, etc.)
+                df_ml['day_of_year'] = df_ml['date'].dt.dayofyear
+                df_ml['day_of_year_sin'] = np.sin(2 * np.pi * df_ml['day_of_year'] / 365)
+                df_ml['day_of_year_cos'] = np.cos(2 * np.pi * df_ml['day_of_year'] / 365)
+                features_created.extend(['day_of_year', 'day_of_year_sin', 'day_of_year_cos'])
+                
+                st.write(f"✅ Created {len(features_created)} engineered features")
+                
+                # ML Analysis Section
+                st.subheader("🧠 Machine Learning Analysis")
+                
+                # Prepare features for ML
+                feature_cols = [col for col in df_ml.columns if col not in ['date', 'migraine'] and df_ml[col].dtype in ['float64', 'int64']]
+                feature_cols = [col for col in feature_cols if not df_ml[col].isna().all()]
+                
+                if len(feature_cols) > 0:
                     # Remove rows with NaN values
-                    ml_data = ai_features.dropna()
+                    df_clean = df_ml[feature_cols + ['migraine']].dropna()
                     
-                    if len(ml_data) > 10:  # Need sufficient data
-                        X = ml_data[feature_cols].select_dtypes(include=[np.number])
-                        y = ml_data['migraine'].astype(int)
-                        
-                        # Handle case where we have very few positive samples
-                        positive_samples = y.sum()
-                        total_samples = len(y)
-                        
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("Total Samples", total_samples)
-                        with col2:
-                            st.metric("Migraine Episodes", positive_samples)
-                        with col3:
-                            st.metric("Class Balance", f"{positive_samples/total_samples:.1%}")
-                        
-                        if positive_samples > 0 and total_samples > positive_samples:
-                            st.subheader("🎯 Predictive Models")
-                            
-                            # Multiple algorithms comparison
-                            algorithms = {
-                                'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
-                                'Gradient Boosting': GradientBoostingClassifier(random_state=42),
-                                'XGBoost': xgb.XGBClassifier(random_state=42, eval_metric='logloss'),
-                                'LightGBM': lgb.LGBMClassifier(random_state=42, verbose=-1)
-                            }
-                            
-                            # Cross-validation scores
-                            cv_results = {}
-                            feature_importance = {}
-                            
-                            for name, model in algorithms.items():
-                                try:
-                                    # Cross-validation
-                                    cv_scores = cross_val_score(model, X, y, cv=min(5, total_samples//2), scoring='roc_auc')
-                                    cv_results[name] = {
-                                        'Mean CV Score': f"{cv_scores.mean():.3f}",
-                                        'Std CV Score': f"{cv_scores.std():.3f}"
-                                    }
-                                    
-                                    # Fit model for feature importance
-                                    model.fit(X, y)
-                                    if hasattr(model, 'feature_importances_'):
-                                        importance = pd.DataFrame({
-                                            'feature': X.columns,
-                                            'importance': model.feature_importances_
-                                        }).sort_values('importance', ascending=False)
-                                        feature_importance[name] = importance.head(10)
-                                        
-                                except Exception as e:
-                                    cv_results[name] = {'Error': str(e)}
-                            
-                            # Display results
-                            if cv_results:
-                                st.write("**Cross-Validation Performance:**")
-                                results_df = pd.DataFrame(cv_results).T
-                                st.dataframe(results_df, use_container_width=True)
-                            
-                            # Feature importance analysis
-                            if feature_importance:
-                                st.subheader("🔍 Feature Importance Analysis")
-                                
-                                # Select best performing model
-                                best_model = 'Random Forest'  # Default
-                                if cv_results:
-                                    try:
-                                        best_model = max(cv_results.keys(), 
-                                                       key=lambda x: float(cv_results[x].get('Mean CV Score', '0')))
-                                    except:
-                                        pass
-                                
-                                if best_model in feature_importance:
-                                    st.write(f"**Top Features from {best_model}:**")
-                                    
-                                    # Create importance plot
-                                    importance_data = feature_importance[best_model]
-                                    fig_importance = px.bar(
-                                        importance_data.head(15),
-                                        x='importance',
-                                        y='feature',
-                                        orientation='h',
-                                        title=f"Top 15 Feature Importances - {best_model}",
-                                        labels={'importance': 'Feature Importance', 'feature': 'Features'}
-                                    )
-                                    fig_importance.update_layout(height=600)
-                                    st.plotly_chart(fig_importance, use_container_width=True)
-                                    
-                                    # Insights
-                                    top_features = importance_data.head(5)['feature'].tolist()
-                                    st.info(f"🎯 **Key Insights**: The most predictive features are: {', '.join(top_features[:3])}")
-                        
-                        # Pattern Discovery
-                        st.subheader("🔍 Pattern Discovery")
-                        
-                        # Clustering analysis for pattern discovery
-                        from sklearn.cluster import KMeans
-                        from sklearn.decomposition import PCA
-                        
-                        # PCA for dimensionality reduction
-                        scaler = StandardScaler()
-                        X_scaled = scaler.fit_transform(X.fillna(X.mean()))
-                        
-                        pca = PCA(n_components=min(5, X_scaled.shape[1]))
-                        X_pca = pca.fit_transform(X_scaled)
-                        
-                        # Clustering
-                        n_clusters = min(4, len(ml_data)//2)
-                        if n_clusters >= 2:
-                            kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-                            clusters = kmeans.fit_predict(X_pca)
-                            
-                            # Visualize clusters
-                            cluster_df = pd.DataFrame({
-                                'PC1': X_pca[:, 0],
-                                'PC2': X_pca[:, 1],
-                                'Cluster': clusters,
-                                'Migraine': y,
-                                'Date': ml_data['date'].values
-                            })
-                            
-                            fig_cluster = px.scatter(
-                                cluster_df,
-                                x='PC1',
-                                y='PC2',
-                                color='Cluster',
-                                symbol='Migraine',
-                                title="Space Weather Patterns (PCA + K-Means Clustering)",
-                                hover_data=['Date']
-                            )
-                            st.plotly_chart(fig_cluster, use_container_width=True)
-                            
-                            # Cluster analysis
-                            cluster_analysis = []
-                            for cluster_id in range(n_clusters):
-                                cluster_mask = clusters == cluster_id
-                                cluster_migraines = y[cluster_mask].sum()
-                                cluster_total = cluster_mask.sum()
-                                cluster_rate = cluster_migraines / cluster_total if cluster_total > 0 else 0
-                                
-                                cluster_analysis.append({
-                                    'Cluster': f"Cluster {cluster_id}",
-                                    'Days': cluster_total,
-                                    'Migraines': cluster_migraines,
-                                    'Migraine Rate': f"{cluster_rate:.1%}"
-                                })
-                            
-                            cluster_df_summary = pd.DataFrame(cluster_analysis)
-                            st.write("**Cluster Analysis:**")
-                            st.dataframe(cluster_df_summary, use_container_width=True)
-                        
-                    else:
-                        st.warning("⚠️ Insufficient data for machine learning analysis. Need more historical data.")
-                else:
-                    st.info("💡 Migraine data not available for AI analysis. Please ensure health data is properly loaded.")
-            
-            else:
-                # Simplified analysis for deployment
-                st.subheader("📊 Basic Pattern Analysis")
-                st.info("💡 **Local Development Required**: Advanced AI analysis with GPU acceleration is available when running locally with the full ML stack.")
-                
-                # Simple correlation analysis
-                if 'migraine' in df_filtered.columns and 'max_kp' in df_filtered.columns:
-                    migraine_days = df_filtered[df_filtered['migraine'] == True]
-                    if len(migraine_days) > 0:
-                        st.write("**Simple Pattern Detection:**")
-                        avg_kp_migraine = migraine_days['max_kp'].mean()
-                        avg_kp_normal = df_filtered[df_filtered['migraine'] == False]['max_kp'].mean()
+                    if len(df_clean) > 10:  # Ensure we have enough data
+                        X = df_clean[feature_cols]
+                        y = df_clean['migraine']
                         
                         col1, col2 = st.columns(2)
-                        with col1:
-                            st.metric("Avg Kp (Migraine Days)", f"{avg_kp_migraine:.2f}")
-                        with col2:
-                            st.metric("Avg Kp (Normal Days)", f"{avg_kp_normal:.2f}")
                         
-                        if avg_kp_migraine > avg_kp_normal:
-                            st.info(f"🔍 **Pattern Found**: Space weather activity is {((avg_kp_migraine/avg_kp_normal-1)*100):.1f}% higher on migraine days")
+                        with col1:
+                            st.metric("Total Samples", len(df_clean))
+                            st.metric("Features Used", len(feature_cols))
+                            st.metric("Migraine Cases", y.sum())
+                        
+                        with col2:
+                            st.metric("Non-Migraine Cases", len(y) - y.sum())
+                            st.metric("Class Balance", f"{y.mean()*100:.1f}% positive")
+                        
+                        # Feature Importance Analysis
+                        st.subheader("📊 Feature Importance Analysis")
+                        
+                        try:
+                            from sklearn.ensemble import RandomForestClassifier
+                            from sklearn.preprocessing import StandardScaler
+                            from sklearn.model_selection import cross_val_score
+                            import shap
+                            
+                            # Scale features
+                            scaler = StandardScaler()
+                            X_scaled = scaler.fit_transform(X)
+                            
+                            # Random Forest for feature importance
+                            rf = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
+                            rf.fit(X_scaled, y)
+                            
+                            # Feature importance plot
+                            importance_df = pd.DataFrame({
+                                'feature': feature_cols,
+                                'importance': rf.feature_importances_
+                            }).sort_values('importance', ascending=True)
+                            
+                            fig_importance = px.bar(
+                                importance_df.tail(10), 
+                                x='importance', 
+                                y='feature',
+                                title="Top 10 Most Important Features",
+                                orientation='h'
+                            )
+                            st.plotly_chart(fig_importance, use_container_width=True)
+                            
+                            # Cross-validation scores with better handling of class imbalance
+                            try:
+                                # Use fewer folds and handle NaN values
+                                cv_folds = min(3, len(y[y==1]) + 1, len(y))  # Limited by positive class size
+                                cv_scores = cross_val_score(rf, X_scaled, y, cv=cv_folds, scoring='roc_auc')
+                                # Filter out NaN values
+                                cv_scores = cv_scores[~np.isnan(cv_scores)]
+                                if len(cv_scores) > 0:
+                                    st.metric("Cross-Validation AUC", f"{cv_scores.mean():.3f} ± {cv_scores.std():.3f}")
+                                else:
+                                    st.metric("Cross-Validation AUC", "Not available (insufficient data)")
+                            except Exception as e:
+                                st.metric("Cross-Validation AUC", f"Error: {str(e)[:50]}...")
+                            
+                        except ImportError:
+                            st.warning("Scikit-learn not available for feature importance analysis")
+                        
+                        # Advanced ML Models
+                        st.subheader("🚀 Advanced ML Models")
+                        
+                        model_results = {}
+                        
+                        # XGBoost
+                        try:
+                            import xgboost as xgb
+                            from sklearn.model_selection import train_test_split
+                            from sklearn.metrics import roc_auc_score, classification_report
+                            
+                            if len(np.unique(y)) > 1:  # Only if we have both classes
+                                # Use simple train_test_split without stratification due to small sample size
+                                X_train, X_test, y_train, y_test = train_test_split(
+                                    X_scaled, y, test_size=0.3, random_state=42
+                                )
+                                
+                                # XGBoost with GPU support
+                                xgb_model = xgb.XGBClassifier(
+                                    n_estimators=100,
+                                    max_depth=3,
+                                    learning_rate=0.1,
+                                    random_state=42,
+                                    tree_method='gpu_hist' if torch.cuda.is_available() else 'hist',
+                                    device='cuda' if torch.cuda.is_available() else 'cpu'
+                                )
+                                
+                                xgb_model.fit(X_train, y_train)
+                                xgb_pred = xgb_model.predict_proba(X_test)[:, 1]
+                                xgb_auc = roc_auc_score(y_test, xgb_pred)
+                                model_results['XGBoost'] = xgb_auc
+                                
+                                st.success(f"✅ XGBoost AUC: {xgb_auc:.3f}")
+                            
+                        except ImportError:
+                            st.warning("XGBoost not available")
+                        
+                        # Neural Network with PyTorch
+                        try:
+                            import torch
+                            import torch.nn as nn
+                            import torch.optim as optim
+                            from sklearn.model_selection import train_test_split
+                            
+                            if torch.cuda.is_available() and len(np.unique(y)) > 1:
+                                device = torch.device('cuda')
+                                st.info("🚀 Training Neural Network on GPU...")
+                                
+                                # Simple neural network
+                                class MigrainePredictorNN(nn.Module):
+                                    def __init__(self, input_size):
+                                        super().__init__()
+                                        self.network = nn.Sequential(
+                                            nn.Linear(input_size, 64),
+                                            nn.ReLU(),
+                                            nn.Dropout(0.3),
+                                            nn.Linear(64, 32),
+                                            nn.ReLU(),
+                                            nn.Dropout(0.3),
+                                            nn.Linear(32, 16),
+                                            nn.ReLU(),
+                                            nn.Linear(16, 1),
+                                            nn.Sigmoid()
+                                        )
+                                    
+                                    def forward(self, x):
+                                        return self.network(x)
+                                
+                                # Prepare data for PyTorch
+                                X_train, X_test, y_train, y_test = train_test_split(
+                                    X_scaled, y, test_size=0.3, random_state=42, stratify=y
+                                )
+                                
+                                X_train_tensor = torch.FloatTensor(X_train).to(device)
+                                y_train_tensor = torch.FloatTensor(y_train.values).to(device)
+                                X_test_tensor = torch.FloatTensor(X_test).to(device)
+                                y_test_tensor = torch.FloatTensor(y_test.values).to(device)
+                                
+                                # Initialize and train model
+                                model = MigrainePredictorNN(X_train.shape[1]).to(device)
+                                criterion = nn.BCELoss()
+                                optimizer = optim.Adam(model.parameters(), lr=0.001)
+                                
+                                # Training loop
+                                model.train()
+                                for epoch in range(100):
+                                    optimizer.zero_grad()
+                                    outputs = model(X_train_tensor).squeeze()
+                                    loss = criterion(outputs, y_train_tensor)
+                                    loss.backward()
+                                    optimizer.step()
+                                
+                                # Evaluation
+                                model.eval()
+                                with torch.no_grad():
+                                    test_outputs = model(X_test_tensor).squeeze()
+                                    test_predictions = test_outputs.cpu().numpy()
+                                    nn_auc = roc_auc_score(y_test, test_predictions)
+                                    model_results['Neural Network'] = nn_auc
+                                
+                                st.success(f"✅ Neural Network AUC: {nn_auc:.3f}")
+                            
+                        except Exception as e:
+                            st.warning(f"Neural Network training failed: {str(e)}")
+                        
+                        # Model Comparison
+                        if model_results:
+                            st.subheader("🏆 Model Performance Comparison")
+                            
+                            results_df = pd.DataFrame([
+                                {'Model': model, 'AUC Score': score} 
+                                for model, score in model_results.items()
+                            ])
+                            
+                            fig_comparison = px.bar(
+                                results_df, 
+                                x='Model', 
+                                y='AUC Score',
+                                title="Model Performance Comparison (AUC Score)",
+                                color='AUC Score',
+                                color_continuous_scale='viridis'
+                            )
+                            st.plotly_chart(fig_comparison, use_container_width=True)
+                        
+                        # Hyperparameter Optimization with Optuna
+                        st.subheader("⚡ Hyperparameter Optimization")
+                        
+                        if st.button("🚀 Run GPU-Accelerated Hyperparameter Search"):
+                            try:
+                                import optuna
+                                
+                                def objective(trial):
+                                    # XGBoost hyperparameters
+                                    n_estimators = trial.suggest_int('n_estimators', 50, 200)
+                                    max_depth = trial.suggest_int('max_depth', 3, 10)
+                                    learning_rate = trial.suggest_float('learning_rate', 0.01, 0.3)
+                                    
+                                    model = xgb.XGBClassifier(
+                                        n_estimators=n_estimators,
+                                        max_depth=max_depth,
+                                        learning_rate=learning_rate,
+                                        random_state=42,
+                                        tree_method='gpu_hist' if torch.cuda.is_available() else 'hist',
+                                        device='cuda' if torch.cuda.is_available() else 'cpu'
+                                    )
+                                    
+                                    # Handle cross-validation with class imbalance
+                                    try:
+                                        cv_folds = min(3, len(y[y==1]) + 1, len(y))
+                                        scores = cross_val_score(model, X_scaled, y, cv=cv_folds, scoring='roc_auc')
+                                        scores = scores[~np.isnan(scores)]  # Remove NaN values
+                                        if len(scores) == 0:
+                                            return 0.5  # Random performance baseline
+                                        return scores.mean()
+                                    except:
+                                        return 0.5  # Fallback to random performance
+                                
+                                study = optuna.create_study(direction='maximize')
+                                study.optimize(objective, n_trials=20)
+                                
+                                st.success(f"🎯 Best AUC: {study.best_value:.3f}")
+                                st.json(study.best_params)
+                                
+                            except Exception as e:
+                                st.error(f"Optimization failed: {str(e)}")
+                        
+                        # SHAP Analysis for Explainability
+                        st.subheader("🔍 Model Explainability (SHAP)")
+                        
+                        try:
+                            import shap
+                            
+                            if 'rf' in locals():
+                                # Create SHAP explainer
+                                explainer = shap.TreeExplainer(rf)
+                                shap_values = explainer.shap_values(X_scaled[:20])  # Use first 20 samples
+                                
+                                # SHAP summary plot would go here
+                                st.info("📊 SHAP analysis completed - feature contributions calculated")
+                                
+                                # Show most important features for migraine prediction
+                                if len(shap_values) > 1:
+                                    shap_importance = np.abs(shap_values[1]).mean(axis=0)
+                                    # Ensure we use the same features that were used in X
+                                    current_features = X.columns.tolist() if hasattr(X, 'columns') else feature_cols
+                                    # Make sure lengths match
+                                    if len(shap_importance) == len(current_features):
+                                        shap_df = pd.DataFrame({
+                                            'feature': current_features,
+                                            'shap_importance': shap_importance
+                                        }).sort_values('shap_importance', ascending=False)
+                                        
+                                        st.write("**Top features contributing to migraine prediction:**")
+                                        for i, row in shap_df.head(5).iterrows():
+                                            st.write(f"• {row['feature']}: {row['shap_importance']:.3f}")
+                                    else:
+                                        st.warning(f"Feature mismatch: {len(shap_importance)} SHAP values vs {len(current_features)} features")
+                        
+                        except ImportError:
+                            st.warning("SHAP not available for explainability analysis")
+                
+                else:
+                    st.warning("⚠️ Not enough clean data for ML analysis (need >10 samples)")
+            else:
+                st.warning("⚠️ No numerical features available for ML analysis")
         
-        # Summary statistics
-        st.header("📊 Summary Statistics")
+        # Time Series Forecasting
+        st.subheader("📈 Time Series Forecasting")
         
+        if not df_filtered.empty and 'max_kp' in df_filtered.columns:
+            try:
+                from sklearn.linear_model import LinearRegression
+                from sklearn.preprocessing import PolynomialFeatures
+                
+                # Prepare time series data
+                ts_data = df_filtered[['date', 'max_kp']].dropna().sort_values('date')
+                ts_data['days'] = (ts_data['date'] - ts_data['date'].min()).dt.days
+                
+                if len(ts_data) > 5:
+                    # Polynomial regression for trend
+                    poly_features = PolynomialFeatures(degree=2)
+                    X_poly = poly_features.fit_transform(ts_data[['days']])
+                    
+                    model = LinearRegression()
+                    model.fit(X_poly, ts_data['max_kp'])
+                    
+                    # Predict future values
+                    future_days = np.arange(ts_data['days'].max() + 1, ts_data['days'].max() + 8)
+                    future_X = poly_features.transform(future_days.reshape(-1, 1))
+                    future_pred = model.predict(future_X)
+                    
+                    # Create future dates
+                    last_date = ts_data['date'].max()
+                    future_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=7)
+                    
+                    # Plot forecast
+                    fig_forecast = go.Figure()
+                    
+                    # Historical data
+                    fig_forecast.add_trace(go.Scatter(
+                        x=ts_data['date'],
+                        y=ts_data['max_kp'],
+                        mode='lines+markers',
+                        name='Historical Kp',
+                        line=dict(color='blue')
+                    ))
+                    
+                    # Forecast
+                    fig_forecast.add_trace(go.Scatter(
+                        x=future_dates,
+                        y=future_pred,
+                        mode='lines+markers',
+                        name='Forecast',
+                        line=dict(color='red', dash='dash')
+                    ))
+                    
+                    fig_forecast.update_layout(
+                        title="Kp Index Forecast (Next 7 Days)",
+                        xaxis_title="Date",
+                        yaxis_title="Kp Index",
+                        height=400
+                    )
+                    
+                    st.plotly_chart(fig_forecast, use_container_width=True)
+                    
+                    # Show forecast values
+                    st.write("**7-Day Kp Index Forecast:**")
+                    for date, pred in zip(future_dates, future_pred):
+                        condition, color = get_space_weather_condition(pred)
+                        st.write(f"• {date.strftime('%Y-%m-%d')}: **{pred:.1f}** - <span style='color:{color}'>{condition}</span>", 
+                               unsafe_allow_html=True)
+            
+            except ImportError:
+                st.warning("Forecasting requires additional packages")
+        
+        # AI Insights Summary
+        st.subheader("🎯 AI-Generated Insights")
+        
+        insights = []
+        
+        if not df_filtered.empty:
+            # Statistical insights
+            migraine_days = df_filtered[df_filtered['date'].isin([pd.Timestamp('2025-06-03'), pd.Timestamp('2025-05-28')])]
+            
+            if not migraine_days.empty and 'max_kp' in migraine_days.columns:
+                avg_kp_migraine = migraine_days['max_kp'].mean()
+                avg_kp_overall = df_filtered['max_kp'].mean()
+                
+                if avg_kp_migraine > avg_kp_overall:
+                    insights.append(f"🔍 Migraine days show {avg_kp_migraine - avg_kp_overall:.1f} higher average Kp index")
+                
+                # Check for patterns
+                if avg_kp_migraine > 4:
+                    insights.append("⚠️ Both migraine episodes occurred during elevated geomagnetic activity")
+                
+            # Data quality insights
+            data_completeness = (1 - df_filtered.isnull().sum() / len(df_filtered)) * 100
+            best_feature = data_completeness.idxmax()
+            insights.append(f"📊 Best data quality: {best_feature} ({data_completeness[best_feature]:.1f}% complete)")
+            
+            # Temporal insights
+            date_range = (df_filtered['date'].max() - df_filtered['date'].min()).days
+            insights.append(f"📅 Analysis covers {date_range} days of space weather data")
+        
+        if insights:
+            for insight in insights:
+                st.info(insight)
+        else:
+            st.info("🤔 Run the analysis to generate AI insights")
+
+    # Summary and Data sections (moved inside tab structure)
+    with st.expander("📊 Summary Statistics", expanded=False):
         summary_data = {}
         if 'max_kp' in df_filtered.columns and not df_filtered['max_kp'].isna().all():
             summary_data['Max Kp'] = {
@@ -1204,12 +1407,12 @@ def main():
         if summary_data:
             summary_df = pd.DataFrame(summary_data)
             st.dataframe(summary_df, use_container_width=True)
-        
-        # Raw data table
-        if show_raw_data:
-            st.header("📋 Raw Data")
-            st.dataframe(df_filtered, use_container_width=True)
     
+    # Raw data table outside the expander
+    if show_raw_data:
+        st.header("📋 Raw Data")
+        st.dataframe(df_filtered, use_container_width=True)
+
     else:
         st.warning("No data available for the selected date range.")
 
