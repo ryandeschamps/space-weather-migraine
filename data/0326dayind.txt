@@ -1,0 +1,50 @@
+:Product: Daily Space Weather Indices dayind.txt
+:Issued: 2025 Mar 27 1816 UT
+# Prepared by the US Dept. of Commerce, NOAA, Space Weather Prediction Center
+# Product description and SWPC contact on the Web
+# https://www.spaceweather.gov
+#
+#                       Daily Space Weather Indices
+#
+#
+:Solar_Indices: 2025 Mar 26
+# SWO Sunspot  Penticton Radio   90-day Radio   GOES X-ray   Stanford Solar
+#   Number       Flux 10.7cm     Flux 10.7cm     Bkgd Flux       Mean Field
+    63              152              184          1.21e-06          -999
+#
+:Solar_Region_Data: 2025 Mar 26
+#                                                 --------- Flares ---------
+# Sunspot Area       New         Spotted           X-ray          Optical
+# 10E-6 Hemis.     Regions        Region           C  M  X       S  1  2  3  4
+    415               0              4             8  1  0       0  0  0  0  0
+#
+:Solar_Radio_Flux: 2025 Mar 26
+#      Learmonth  San Vito   Sag Hill  Penticton  Penticton  Palehua  Penticton
+#        0400       1000       1700       1700       2000       2300       2300
+  245     27         18         21         -1         -1         21         -1
+  410     44         33         41         -1         -1         40         -1
+  610     67         47         59         -1         -1         62         -1
+ 1415    112        105        104         -1         -1        114         -1
+ 2695    149        138        150         -1         -1        149         -1
+ 2800     -1         -1         -1        158        152         -1        154
+ 4995    184        198        199         -1         -1        195         -1
+ 8800    265        262        273         -1         -1        302         -1
+15400    552        426        579         -1         -1        573         -1
+#
+:Particle_Data: 2025 Mar 26
+#    GOES Proton Fluence          GOES Electron Fluence     GOES      Neutron
+# ---- Protons/cm2-day-sr ----   - Electrons/cm2-day-sr -  Location    Monitor
+#  ->1 MeV   >10 MeV  >100 MeV     >0.8 MeV     >2 MeV       West    % of bkgd
+  2.12e+06  1.57e+04 -1.00e+00    -1.00e+00   1.80e+06      75.20      -999.9
+#
+:Geomagnetic_Indices: 2025 Mar 26
+#      Middle Latitude                       Middle Latitude
+# ----- Fredericksburg -----           --------- Boulder ---------
+# A        K-indices                   A        K-indices
+#     03-06-09-12-15-18-21-24              03-06-09-12-15-18-21-24
+ 26    4  3  2  2  5  4  5  4         35    4  4  2  3  5  5  6  4 
+#        High Latitude                                  Estimated
+# --------- College ---------      -------------------- Planetary --------------------
+# A       K-indices                A                    K-indices
+#     03-06-09-12-15-18-21-24            03  - 06  - 09  - 12  - 15  - 18  - 21  - 24
+ 43    4  4  2  4  6  6  5  5     46    4.67  4.33  2.33  3.33  5.67  5.67  6.33  4.67 
