@@ -107,7 +107,9 @@ def parse_space_weather_file(file_path):
 @st.cache_data
 def load_all_data():
     """Load and parse all space weather data files"""
-    data_dir = "/srv/docker/kpindex/data"
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(script_dir, "data")
     all_data = []
     
     # Get all dayind.txt files
